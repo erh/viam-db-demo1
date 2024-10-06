@@ -296,7 +296,7 @@
    setTimeout(updateCloudDataAndLoop, 1000);
  }
 
- async function getDataViaMQL(dc, g, startTime) {
+ async function getDataViaMQL(dc, g, startTime, key) {
    var match = {
      "location_id" : globalClientCloudMetaData.locationId,
      "robot_id" : globalClientCloudMetaData.machineId,
@@ -317,8 +317,8 @@
                                   { "$toString" : { "$multiply" : [ 15, { "$floor" : { "$divide": [ { "$minute": "$time_received"}, 15] } } ] } }
                                   ] },
      "ts" : { "$min" : "$time_received" },
-     //"min" : { "$min" : "$data.readings.Level" },
-     //"max" : { "$max" : "$data.readings.Level" }
+     "min" : { "$min" : "$data.readings." + key },
+     "max" : { "$max" : "$data.readings." + key }
    };
    
    console.log(match);
@@ -326,7 +326,7 @@
 
    var query = [
      BSON.serialize( { "$match" : match } ),
-     //BSON.serialize( { "$group" : group } ),
+     BSON.serialize( { "$group" : group } ),
      BSON.serialize( { "$sort" : { ts : -1 } } ),
      BSON.serialize( { "$limit" : (24 * 4) } ),
      BSON.serialize( { "$sort" : { ts : 1 } } ),
