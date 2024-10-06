@@ -137,6 +137,7 @@
  }
 
  function doCameraLoop(loopNumber: int, client: VIAM.RobotClient) {
+   var start = new Date();
    filterResources(globalData.allResources, "component", "camera").forEach( (r) => {
      if (globalData.cameraNames.indexOf(r.name) < 0) {
        globalData.cameraNames.push(r.name);
@@ -149,6 +150,7 @@
          if (i) {
            i.src = URL.createObjectURL(new Blob([img]));
          }
+         console.log(  "time to fetch img: " + ((new Date()) - start) + " ms");
      }).catch(errorHandler);
      
    });
