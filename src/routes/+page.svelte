@@ -105,35 +105,16 @@
 
    if (globalConfig.batterySensorName != "") {
      new VIAM.SensorClient(client, globalConfig.batterySensorName).getReadings().then((d) => {
-       globalData.gauges["battery"] = d.percentage * 100;
+       d["_display"] = (d["percentage"] * 100).toFixed(2) + "%";
+       d["_displayName"] = "battery";
+       d["_key"] = "percentage";
+       globalData.gauges[globalConfig.batterySensorName] = d;
      }).catch( (e) => {
        globalConfig.windSensorName = "";
        errorHandler(e);
      });
-   
-   }
-   
-   if (loopNumber % 30 == 2 ) {
      
-     globalData.allResources.forEach( (r) => {
-       if (r.subtype != "sensor") {
-         return;
-       }
-       if (r.name.indexOf("fuel-") < 0 && r.name.indexOf("freshwater") < 0) {
-         return;
-       }
-       
-       var sp = r.name.split(":");
-       var name = sp[sp.length-1];
-
-       new VIAM.SensorClient(client, r.name).getReadings().then((raw) => {
-         globalData.gauges[name] = raw;
-       });
-     });
-
    }
-   
-   
  }
 
  function doCameraLoop(loopNumber: int, client: VIAM.RobotClient) {
@@ -150,7 +131,10 @@
          if (i) {
            i.src = URL.createObjectURL(new Blob([img]));
          }
-         console.log(  "time to fetch img: " + ((new Date()) - start) + " ms");
+         var ms = (new Date()) - start;
+         if (ms > 500) {
+           console.log(  "time to fetch img was slow: " + ms + "ms");
+         }
      }).catch(errorHandler);
      
    });
@@ -323,9 +307,6 @@
      "max" : { "$max" : "$data.readings." + key }
    };
    
-   console.log(match);
-   console.log(group);
-
    var query = [
      BSON.serialize( { "$match" : match } ),
      BSON.serialize( { "$group" : group } ),
@@ -354,11 +335,10 @@
      }
 
      var timeStart = new Date();
-     var data = await getDataViaMQL(dc, g, startTime);
+     var data = await getDataViaMQL(dc, g, startTime, globalData.gauges[g]["_key"]);
      var getDataTime = (new Date()).getTime() - timeStart.getTime();
      
      console.log("time to get graph data for " + g + " took " + getDataTime + " and had " + data.length + " points");
-     
      h = { ts : new Date(), data : data };
      globalData.gaugesToHistorical[g] = h;
    }
@@ -431,7 +411,19 @@
    
    for ( var i = 0; i < names.length; i++) {
      var n = names[i];
-     a.push( [ n, gauges[n] ]);
+     var v = gauges[n];
+
+     var name = n;
+     var value = v;
+
+     if ("_display" in v) {
+       value = v["_display"];
+     }
+     if ("_displayName" in v) {
+       name = v["_displayName"];
+     }
+     var x = { "name" : name, "value" : value };
+     a.push( [ n, x ]);
    }
    return a;
  }
@@ -525,10 +517,10 @@
       <div class="flex flex-col divide-y">
         {#each gaugesToArray(globalData.gauges) as [key, value]}
           <section class="overflow-visible flex gap-2 p-2 text-lg">
-            <h2 class="min-w-32 capitalize">{key}</h2>
+            <h2 class="min-w-32 capitalize">{value.name}</h2>
             <div class="grow">
               <div class="flex gap-1 font-bold">
-                <div>{value.toFixed(0)} %</div>
+                <div>{value.value}</div>
               </div>
               {#if globalData.gaugesToHistorical[key]}
               <div class="relative">
@@ -538,7 +530,6 @@
                     style="width: 100%;"
                     width="100"
                     type="line"
-                    scaleMax=100
                     linked="{key}"
                     uid="{key}"
                     barMinWidth="1"
